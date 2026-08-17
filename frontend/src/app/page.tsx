@@ -3,9 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  Upload, FileImage, Cpu, Layers, Activity, 
+  Upload, FileImage, Layers, Activity, 
   FileText, Copy, Check, RotateCcw, AlertCircle, 
-  ZoomIn, Eye, Sparkles, Download
+  Eye, Download
 } from 'lucide-react';
 
 interface GeometryItem {
@@ -55,7 +55,6 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Clean up Object URL
   useEffect(() => {
     return () => {
       if (imageUrl) {
@@ -67,7 +66,6 @@ export default function Home() {
   const handleFileChange = (selectedFile: File) => {
     if (!selectedFile) return;
     
-    // Check type
     if (!selectedFile.type.startsWith('image/')) {
       setError('Invalid file type. Please upload a PNG or JPG floorplan.');
       return;
@@ -79,8 +77,7 @@ export default function Home() {
     setHoveredRoomId(null);
     setSelectedRoomId(null);
 
-    const url = URL.createObjectURL(selectedFile);
-    setImageUrl(url);
+    setImageUrl(URL.createObjectURL(selectedFile));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -94,10 +91,6 @@ export default function Home() {
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   const uploadAndProcess = async () => {
     if (!file) return;
 
@@ -108,7 +101,6 @@ export default function Home() {
     formData.append('file', file);
 
     try {
-      // Post to local FastAPI server
       const response = await axios.post<SpatialGraphResponse>(
         'http://localhost:8000/api/v1/uploads', 
         formData,
@@ -144,14 +136,11 @@ export default function Home() {
       const serializer = new XMLSerializer();
       let source = serializer.serializeToString(svgElement);
       
-      // Ensure xmlns is present
       if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
         source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
       }
       
-      // Add XML declaration
       source = '<?xml version="1.0" encoding="utf-8"?>\n' + source;
-
       const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       
@@ -177,25 +166,24 @@ export default function Home() {
     setSelectedRoomId(null);
   };
 
-  // Generate color palette based on room type
   const getRoomColor = (type: string, id: number, isHovered: boolean, isSelected: boolean) => {
-    let hue = 210; // Default blue-gray for rooms
+    let hue = 210;
     let sat = 50;
     let light = 60;
 
     if (type === 'corridor') {
-      hue = 45; // Muted orange/amber for corridors
+      hue = 45;
       sat = 55;
       light = 65;
     } else if (type === 'elevator') {
-      hue = 0; // Muted red for elevators
+      hue = 0;
       sat = 50;
       light = 65;
     } else if (type === 'stairs') {
-      hue = 280; // Muted purple for stairs
+      hue = 280;
       sat = 45;
       light = 65;
-    } else { // room
+    } else {
       hue = 200 + ((id * 37) % 30);
       sat = 50;
       light = 60;
@@ -224,10 +212,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
-
-
       <div className="max-w-7xl mx-auto px-6 mt-8">
-        {/* Simple Page Intro Heading */}
         <div className="mb-6 border-b border-slate-200 pb-4">
           <h2 className="text-2xl font-bold text-slate-950">Floorplan Spatial Parser</h2>
         </div>
@@ -241,13 +226,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* 2-Column Wireframe Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT: Controls & Setup */}
           <div className="lg:col-span-4 space-y-6">
-            
-            {/* INGESTION BOX */}
             <div className="bg-white border border-slate-200 rounded-md p-5 shadow-sm">
               <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
                 <FileImage className="h-4 w-4 text-slate-500" /> 1. Upload Floorplan
@@ -257,7 +237,7 @@ export default function Home() {
                 <div 
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
-                  onClick={triggerFileInput}
+                  onClick={() => fileInputRef.current?.click()}
                   className="border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100/60 rounded p-6 text-center cursor-pointer transition-colors"
                 >
                   <input 
@@ -324,9 +304,8 @@ export default function Home() {
               )}
             </div>
 
-            {/* PROCESS EXPLANATION */}
             <div className="bg-white border border-slate-200 rounded-md p-5 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Pipeline Math</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Pipeline Overview</h3>
               <ol className="text-xs text-slate-600 space-y-2.5 list-decimal pl-4">
                 <li>
                   <span className="font-bold text-slate-800">Dynamic Normalization</span>: Scale dimensions to 1200px and auto-invert if dark-mode.
@@ -344,10 +323,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* RIGHT: Visual Canvas & Inspector Panels */}
           <div className="lg:col-span-8 space-y-6">
-            
-            {/* INTERACTIVE CANVAS */}
             <div className="bg-white border border-slate-200 rounded-md p-5 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -390,7 +366,6 @@ export default function Home() {
                           className="absolute inset-0 w-full h-full"
                           style={{ pointerEvents: 'none' }}
                         >
-                          {/* Polygons (Geometry) */}
                           {responseData.geometry.map((geom) => {
                             const isHovered = hoveredRoomId === geom.id;
                             const isSelected = selectedRoomId === geom.id;
@@ -412,7 +387,6 @@ export default function Home() {
                             );
                           })}
 
-                          {/* Adjacency Graph Lines */}
                           {responseData.topology.edges.map((edge, index) => {
                             const srcNode = responseData.topology.nodes.find(n => n.id === edge.source);
                             const tgtNode = responseData.topology.nodes.find(n => n.id === edge.target);
@@ -439,7 +413,6 @@ export default function Home() {
                             );
                           })}
 
-                          {/* Graph Nodes (Centroids) */}
                           {responseData.topology.nodes.map((node) => {
                             const isHovered = hoveredRoomId === node.id;
                             const isSelected = selectedRoomId === node.id;
@@ -483,11 +456,8 @@ export default function Home() {
               )}
             </div>
 
-            {/* RESULTS METRICS & ANALYSIS PANELS */}
             {responseData && (
               <div className="space-y-6">
-                
-                {/* Stats Table Grid */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-white border border-slate-200 rounded p-4 shadow-sm">
                     <p className="text-[10px] uppercase font-bold text-slate-400">Processing Time</p>
@@ -509,7 +479,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Sub-counts row */}
                 <div className="bg-slate-100 border border-slate-200 rounded p-3 text-xs flex flex-wrap gap-4 font-mono text-slate-600">
                   <span>Rooms: {responseData.geometry.filter(g => g.type === 'room').length}</span>
                   <span>Corridors: {responseData.geometry.filter(g => g.type === 'corridor').length}</span>
@@ -517,10 +486,7 @@ export default function Home() {
                   <span>Stairs: {responseData.geometry.filter(g => g.type === 'stairs').length}</span>
                 </div>
 
-                {/* Lists Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
-                  {/* Space element registry */}
                   <div className="bg-white border border-slate-200 rounded p-4 shadow-sm space-y-3">
                     <h4 className="text-xs font-bold text-slate-900 border-b border-slate-100 pb-2 flex justify-between">
                       <span>Spatial Directory</span>
@@ -556,7 +522,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Adjacency Matrix Edges */}
                   <div className="bg-white border border-slate-200 rounded p-4 shadow-sm space-y-3">
                     <h4 className="text-xs font-bold text-slate-900 border-b border-slate-100 pb-2 flex justify-between">
                       <span>Adjacency Relations</span>
@@ -591,7 +556,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Raw JSON Inspector */}
                 <div className="border border-slate-200 rounded overflow-hidden">
                   <button 
                     onClick={() => setShowRawJSON(!showRawJSON)}
@@ -609,7 +573,7 @@ export default function Home() {
                           onClick={copyToClipboard}
                           className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded text-[10px] flex items-center gap-1 font-semibold text-slate-600 transition-colors"
                         >
-                          {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                          {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
                           <span>{copied ? 'Copied' : 'Copy Data'}</span>
                         </button>
                       </div>
@@ -619,16 +583,12 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-
               </div>
             )}
-
           </div>
         </div>
-
       </div>
 
-      {/* Simple Custom Scrollbar Style */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 5px;
