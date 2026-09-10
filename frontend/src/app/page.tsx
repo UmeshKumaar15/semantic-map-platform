@@ -488,7 +488,7 @@ export default function Home() {
                                   fontSize={isHovered || isSelected ? "11" : "8"}
                                   fontWeight="bold"
                                   textAnchor="middle"
-                                  style={{ select: 'none', userSelect: 'none' }}
+                                  style={{ userSelect: 'none' }}
                                 >
                                   {node.type === 'room' ? `Room ${node.id}` : `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.id}`}
                                 </text>
