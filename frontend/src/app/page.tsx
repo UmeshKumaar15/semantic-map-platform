@@ -385,120 +385,172 @@ export default function Home() {
               </div>
 
               {!responseData ? (
-                <div className="h-[380px] rounded border border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 text-center p-6">
+                <div className="h-[380px] rounded border border-dashed border-slate-200 bg-white flex flex-col items-center justify-center text-slate-400 text-center p-6">
                   <Eye className="h-8 w-8 text-slate-300 mb-2" />
                   <p className="text-xs font-bold text-slate-600">No layout output loaded</p>
-                  <p className="text-[11px] max-w-xs mt-1 text-slate-400">Please upload a floorplan drawing and click "Run Inferences" to see semantic boundaries and adjacency graph lines.</p>
+                  <p className="text-[11px] max-w-xs mt-1 text-slate-400">Please upload a floorplan drawing and click "Run Inferences" to see semantic boundaries inside Quadrant I (+,+).</p>
                 </div>
               ) : (
-                <div className="relative border border-slate-200 rounded bg-slate-100 flex items-center justify-center overflow-hidden max-h-[500px]">
-                  {imageUrl && (
-                    <>
-                      <img 
-                        src={imageUrl} 
-                        alt="Blueprint source background" 
-                        className="max-w-full max-h-[500px] object-contain block opacity-30 select-none pointer-events-none"
-                        onLoad={(e) => {
-                          const img = e.currentTarget;
-                          setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-                        }}
-                      />
-                      {imageSize && (
-                        <svg
-                          ref={svgRef}
-                          viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-                          className="absolute inset-0 w-full h-full"
-                          style={{ pointerEvents: 'none' }}
-                        >
-                          {/* Polygons (Geometry) */}
-                          {responseData.geometry.map((geom) => {
-                            const isHovered = hoveredRoomId === geom.id;
-                            const isSelected = selectedRoomId === geom.id;
-                            const colors = getRoomColor(geom.type, geom.id, isHovered, isSelected);
+                <div className="bg-white border border-slate-200 rounded p-6 overflow-auto">
+                  {/* Quadrant System Header Badge */}
+                  <div className="mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">
+                      Cartesian Display Scale: Image placed in Quadrant I (+,+) with Origin (0,0) at bottom-left corner.
+                    </span>
+                  </div>
 
-                            return (
-                              <polygon
-                                key={`room-${geom.id}`}
-                                points={geom.coordinates.map((c) => `${c[0]},${c[1]}`).join(' ')}
-                                fill={colors.fill}
-                                stroke={colors.stroke}
-                                strokeWidth={colors.strokeWidth}
-                                className="transition-all duration-150 cursor-pointer"
-                                style={{ pointerEvents: 'auto' }}
-                                onMouseEnter={() => setHoveredRoomId(geom.id)}
-                                onMouseLeave={() => setHoveredRoomId(null)}
-                                onClick={() => setSelectedRoomId(selectedRoomId === geom.id ? null : geom.id)}
-                              />
-                            );
-                          })}
+                  {/* 4-QUADRANT STUDENT WIREFRAME CANVAS (White BG, Thin Black Axes, Red Points) */}
+                  <div className="relative mx-auto my-8 bg-white border border-slate-200 p-8 flex items-center justify-center" style={{ minWidth: '550px', minHeight: '450px' }}>
+                    
+                    {/* Quadrant Overlay Axes Frame */}
+                    <div className="relative border-l-2 border-b-2 border-black p-2 bg-white" style={{ maxWidth: '100%' }}>
+                      
+                      {/* Quadrant Labels */}
+                      <div className="absolute -top-6 right-2 text-[11px] font-mono font-bold text-black bg-white px-1">
+                        Quadrant I (+,+)
+                      </div>
+                      <div className="absolute -top-6 left-[-110px] text-[10px] font-mono text-slate-400">
+                        Quadrant II (-,+)
+                      </div>
+                      <div className="absolute -bottom-6 left-[-110px] text-[10px] font-mono text-slate-400">
+                        Quadrant III (-,-)
+                      </div>
+                      <div className="absolute -bottom-6 right-2 text-[10px] font-mono text-slate-400">
+                        Quadrant IV (+,-)
+                      </div>
 
-                          {/* Adjacency Graph Lines */}
-                          {responseData.topology.edges.map((edge, index) => {
-                            const srcNode = responseData.topology.nodes.find(n => n.id === edge.source);
-                            const tgtNode = responseData.topology.nodes.find(n => n.id === edge.target);
+                      {/* Axis Markers (+Y, -Y, +X, -X) */}
+                      <div className="absolute -top-6 left-[-6px] text-[11px] font-mono font-bold text-black">
+                        +Y ▲
+                      </div>
+                      <div className="absolute -bottom-6 right-[-24px] text-[11px] font-mono font-bold text-black">
+                        +X ▶
+                      </div>
 
-                            if (!srcNode || !tgtNode) return null;
+                      {/* Origin (0,0) Red Target Indicator */}
+                      <div className="absolute -bottom-2 -left-2 z-30 flex items-center gap-1">
+                        <div className="w-3.5 h-3.5 rounded-full bg-red-600 border-2 border-white shadow-xs flex items-center justify-center">
+                          <div className="w-1 h-1 rounded-full bg-white"></div>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-red-600 bg-white border border-red-200 px-1 rounded shadow-xs">
+                          Origin (0,0)
+                        </span>
+                      </div>
 
-                            const isEdgeHighlighted = 
-                              hoveredRoomId === edge.source || 
-                              hoveredRoomId === edge.target || 
-                              selectedRoomId === edge.source || 
-                              selectedRoomId === edge.target;
-
-                            return (
-                              <line
-                                key={`edge-${index}`}
-                                x1={srcNode.centroid[0]}
-                                y1={srcNode.centroid[1]}
-                                x2={tgtNode.centroid[0]}
-                                y2={tgtNode.centroid[1]}
-                                stroke={isEdgeHighlighted ? "#22c55e" : "#8b5cf6"}
-                                strokeWidth={isEdgeHighlighted ? 3 : 1.5}
-                                strokeDasharray={isEdgeHighlighted ? "none" : "4,4"}
-                              />
-                            );
-                          })}
-
-                          {/* Graph Nodes (Centroids) */}
-                          {responseData.topology.nodes.map((node) => {
-                            const isHovered = hoveredRoomId === node.id;
-                            const isSelected = selectedRoomId === node.id;
-                            
-                            return (
-                              <g 
-                                key={`node-${node.id}`}
-                                style={{ pointerEvents: 'auto' }}
-                                onMouseEnter={() => setHoveredRoomId(node.id)}
-                                onMouseLeave={() => setHoveredRoomId(null)}
-                                onClick={() => setSelectedRoomId(selectedRoomId === node.id ? null : node.id)}
-                                className="cursor-pointer"
+                      {/* IMAGE & OVERLAY (Placed strictly in Quadrant I) */}
+                      <div className="relative overflow-hidden bg-white">
+                        {imageUrl && (
+                          <>
+                            <img 
+                              src={imageUrl} 
+                              alt="Quadrant I (+,+) Floorplan" 
+                              className="max-w-full max-h-[420px] object-contain block opacity-40 select-none pointer-events-none"
+                              onLoad={(e) => {
+                                const img = e.currentTarget;
+                                setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+                              }}
+                            />
+                            {imageSize && (
+                              <svg
+                                ref={svgRef}
+                                viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+                                className="absolute inset-0 w-full h-full"
+                                style={{ pointerEvents: 'none' }}
                               >
-                                <circle
-                                  cx={node.centroid[0]}
-                                  cy={node.centroid[1]}
-                                  r={isHovered || isSelected ? 7 : 4}
-                                  fill={isHovered || isSelected ? "#22c55e" : "#8b5cf6"}
-                                  stroke="#ffffff"
-                                  strokeWidth={1}
-                                />
-                                <text
-                                  x={node.centroid[0]}
-                                  y={node.centroid[1] - 8}
-                                  fill={isHovered || isSelected ? "#15803d" : "#4b5563"}
-                                  fontSize={isHovered || isSelected ? "11" : "8"}
-                                  fontWeight="bold"
-                                  textAnchor="middle"
-                                  style={{ userSelect: 'none' }}
-                                >
-                                  {node.type === 'room' ? `Room ${node.id}` : `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.id}`}
-                                </text>
-                              </g>
-                            );
-                          })}
-                        </svg>
-                      )}
-                    </>
-                  )}
+                                {/* Polygons (Geometry) */}
+                                {responseData.geometry.map((geom) => {
+                                  const isHovered = hoveredRoomId === geom.id;
+                                  const isSelected = selectedRoomId === geom.id;
+                                  const colors = getRoomColor(geom.type, geom.id, isHovered, isSelected);
+
+                                  return (
+                                    <polygon
+                                      key={`room-${geom.id}`}
+                                      points={geom.coordinates.map((c) => `${c[0]},${c[1]}`).join(' ')}
+                                      fill={colors.fill}
+                                      stroke={colors.stroke}
+                                      strokeWidth={colors.strokeWidth}
+                                      className="transition-all duration-150 cursor-pointer"
+                                      style={{ pointerEvents: 'auto' }}
+                                      onMouseEnter={() => setHoveredRoomId(geom.id)}
+                                      onMouseLeave={() => setHoveredRoomId(null)}
+                                      onClick={() => setSelectedRoomId(selectedRoomId === geom.id ? null : geom.id)}
+                                    />
+                                  );
+                                })}
+
+                                {/* Adjacency Graph Lines */}
+                                {responseData.topology.edges.map((edge, index) => {
+                                  const srcNode = responseData.topology.nodes.find(n => n.id === edge.source);
+                                  const tgtNode = responseData.topology.nodes.find(n => n.id === edge.target);
+
+                                  if (!srcNode || !tgtNode) return null;
+
+                                  const isEdgeHighlighted = 
+                                    hoveredRoomId === edge.source || 
+                                    hoveredRoomId === edge.target || 
+                                    selectedRoomId === edge.source || 
+                                    selectedRoomId === edge.target;
+
+                                  return (
+                                    <line
+                                      key={`edge-${index}`}
+                                      x1={srcNode.centroid[0]}
+                                      y1={srcNode.centroid[1]}
+                                      x2={tgtNode.centroid[0]}
+                                      y2={tgtNode.centroid[1]}
+                                      stroke={isEdgeHighlighted ? "#ef4444" : "#000000"}
+                                      strokeWidth={isEdgeHighlighted ? 2.5 : 1}
+                                      strokeDasharray={isEdgeHighlighted ? "none" : "3,3"}
+                                    />
+                                  );
+                                })}
+
+                                {/* Graph Nodes (Centroids - Red Points) */}
+                                {responseData.topology.nodes.map((node) => {
+                                  const isHovered = hoveredRoomId === node.id;
+                                  const isSelected = selectedRoomId === node.id;
+                                  
+                                  return (
+                                    <g 
+                                      key={`node-${node.id}`}
+                                      style={{ pointerEvents: 'auto' }}
+                                      onMouseEnter={() => setHoveredRoomId(node.id)}
+                                      onMouseLeave={() => setHoveredRoomId(null)}
+                                      onClick={() => setSelectedRoomId(selectedRoomId === node.id ? null : node.id)}
+                                      className="cursor-pointer"
+                                    >
+                                      <circle
+                                        cx={node.centroid[0]}
+                                        cy={node.centroid[1]}
+                                        r={isHovered || isSelected ? 6 : 4}
+                                        fill="#ef4444"
+                                        stroke="#ffffff"
+                                        strokeWidth={1.5}
+                                      />
+                                      <text
+                                        x={node.centroid[0]}
+                                        y={node.centroid[1] - 7}
+                                        fill={isHovered || isSelected ? "#ef4444" : "#000000"}
+                                        fontSize={isHovered || isSelected ? "11" : "8"}
+                                        fontWeight="bold"
+                                        textAnchor="middle"
+                                        style={{ userSelect: 'none' }}
+                                      >
+                                        {node.type === 'room' ? `Room ${node.id}` : `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.id}`}
+                                      </text>
+                                    </g>
+                                  );
+                                })}
+                              </svg>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>
