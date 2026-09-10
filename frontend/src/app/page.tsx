@@ -108,7 +108,7 @@ export default function Home() {
     formData.append('file', file);
 
     try {
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'https://semantic-map-platform.onrender.com').replace(/\/$/, '');
       const response = await axios.post<SpatialGraphResponse>(
         `${apiBase}/api/v1/uploads`, 
         formData,
@@ -121,9 +121,10 @@ export default function Home() {
       setResponseData(response.data);
     } catch (err: any) {
       console.error(err);
+      const targetUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://semantic-map-platform.onrender.com').replace(/\/$/, '');
       setError(
         err.response?.data?.detail || 
-        'Could not connect to the map processing service. Make sure the backend FastAPI server is running on port 8000.'
+        `Could not connect to map processing service at ${targetUrl}. (If server was sleeping on Render, please wait 30 seconds and try again).`
       );
     } finally {
       setIsProcessing(false);
