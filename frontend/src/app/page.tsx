@@ -246,9 +246,6 @@ export default function Home() {
         {/* Simple Page Intro */}
         <div className="mb-8 border-b border-slate-200 pb-6">
           <h2 className="text-2xl font-bold text-slate-950">Floorplan Spatial Parser</h2>
-          <p className="mt-1 text-slate-500 text-sm">
-            Upload floorplan drawings (PNG/JPG) to parse rooms, corridors, stairs, and elevators into spatial graph coordinates using a local geometry pipeline.
-          </p>
         </div>
 
         {error && (
@@ -342,25 +339,6 @@ export default function Home() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* PROCESS EXPLANATION */}
-            <div className="bg-white border border-slate-200 rounded-md p-5 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Pipeline Math</h3>
-              <ol className="text-xs text-slate-600 space-y-2.5 list-decimal pl-4">
-                <li>
-                  <span className="font-bold text-slate-800">Dynamic Normalization</span>: Scale dimensions to 1200px and auto-invert if dark-mode.
-                </li>
-                <li>
-                  <span className="font-bold text-slate-800">Binarization & Closing</span>: Thick wall structures are dilated to seal doorways and windows.
-                </li>
-                <li>
-                  <span className="font-bold text-slate-800">Interior Gradient Audit</span>: Calculate line directionality (parallelism) inside spaces.
-                </li>
-                <li>
-                  <span className="font-bold text-slate-800">Topology Generation</span>: Check adjacent room boundaries and write edges.
-                </li>
-              </ol>
             </div>
           </div>
 
