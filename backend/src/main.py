@@ -30,4 +30,9 @@ app.include_router(uploads_router, prefix="/api/v1")
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "model_architecture": "Hourglass / ResNet-UNet Encoder-Decoder Architecture (CubiCasa5k & MLStructFP)",
+        "framework": "PyTorch 2.0+",
+        "version": "2.0.0"
+    }

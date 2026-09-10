@@ -22,6 +22,9 @@ from shared.schemas.spatial_graph import (
     TopologyNode,
     TopologyEdge,
 )
+from backend.src.services.floorplan_model import FloorplanMLService, CLASS_MAP
+
+ml_service = FloorplanMLService()
 
 router = APIRouter()
 
@@ -78,7 +81,10 @@ async def upload_floorplan(file: UploadFile = File(...)):
         img_resized = 255 - img_resized
         min_val, max_val = float(img_resized.min()), float(img_resized.max())
 
-    # STAGE 1: GEOMETRY EXTRACTION & CLEANUP (OpenCV & Shapely)
+    # STAGE 1: DEEP LEARNING INFERENCE (Hourglass / ResNet-UNet Encoder-Decoder)
+    pred_mask = ml_service.predict_mask(img_resized)
+
+    # STAGE 2: GEOMETRY EXTRACTION & CLEANUP (OpenCV & Shapely)
     # Binarize image dynamically: walls/lines are white (255) in thresh_inv, empty space is black (0)
     if max_val - min_val > 1.0:
         thresh_val = min_val + 0.85 * (max_val - min_val)
