@@ -14,6 +14,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+BACKEND_SRC = Path(__file__).resolve().parent.parent.parent
+if str(BACKEND_SRC) not in sys.path:
+    sys.path.insert(0, str(BACKEND_SRC))
+
 from shared.schemas.spatial_graph import (
     SpatialGraphResponse,
     GeometryItem,
@@ -21,8 +25,10 @@ from shared.schemas.spatial_graph import (
     TopologyNode,
     TopologyEdge,
 )
+from services.floorplan_model import FloorplanMLService, CLASS_MAP
 
 router = APIRouter()
+ml_service = FloorplanMLService()
 
 @router.post("/uploads", response_model=SpatialGraphResponse)
 async def upload_floorplan(file: UploadFile = File(...)):
@@ -68,6 +74,9 @@ async def upload_floorplan(file: UploadFile = File(...)):
     if median_val <= midpoint:
         img_resized = 255 - img_resized
         min_val, max_val = float(img_resized.min()), float(img_resized.max())
+
+    # ML Inference Prediction Mask
+    ml_pred_mask = ml_service.predict_mask(img_resized)
 
     # thresholding and binarization
     thresh_val = min_val + 0.85 * (max_val - min_val) if max_val - min_val > 1.0 else 220.0
@@ -168,21 +177,32 @@ async def upload_floorplan(file: UploadFile = File(...)):
                         peak = np.argmax(hist)
                         parallelism = (hist[peak] + hist[(peak-1)%18] + hist[(peak+1)%18]) / len(angles)
 
-                # Space Classification
-                if part.area > 20000.0 and compactness < 0.15:
-                    room_type = "corridor"
-                elif edge_density >= 0.05:
-                    if parallelism > 0.65 and part.area < 10000.0 and aspect_ratio > 1.2:
-                        room_type = "stairs"
-                    else:
-                        room_type = "room"
+                # Check if ML model mask predicts a clear class inside inner_mask
+                ml_class_id = 0
+                if inner_area > 0 and np.any(ml_pred_mask):
+                    crop_ml = ml_pred_mask[inner_mask > 0]
+                    counts = np.bincount(crop_ml)
+                    if len(counts) > 1 and np.max(counts[1:]) > 0.4 * len(crop_ml):
+                        ml_class_id = np.argmax(counts[1:]) + 1
+
+                # Space Classification (Hybrid ML + Heuristics)
+                if ml_class_id in CLASS_MAP:
+                    room_type = CLASS_MAP[ml_class_id]
                 else:
-                    if 800 <= part.area <= 8000 and aspect_ratio < 1.35 and solidity > 0.85 and edge_density > 0.02:
-                        room_type = "elevator"
-                    elif (aspect_ratio > 2.5 or compactness < 0.15) and part.area < 10000.0:
+                    if part.area > 20000.0 and compactness < 0.15:
                         room_type = "corridor"
+                    elif edge_density >= 0.05:
+                        if parallelism > 0.65 and part.area < 10000.0 and aspect_ratio > 1.2:
+                            room_type = "stairs"
+                        else:
+                            room_type = "room"
                     else:
-                        room_type = "room"
+                        if 800 <= part.area <= 8000 and aspect_ratio < 1.35 and solidity > 0.85 and edge_density > 0.02:
+                            room_type = "elevator"
+                        elif (aspect_ratio > 2.5 or compactness < 0.15) and part.area < 10000.0:
+                            room_type = "corridor"
+                        else:
+                            room_type = "room"
 
                 # Geometry refinement
                 if room_type in ["room", "stairs", "elevator"]:

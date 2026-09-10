@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
   Upload, FileImage, Layers, Activity, 
   FileText, Copy, Check, RotateCcw, AlertCircle, 
-  Eye, Download
+  Eye, Download, Crosshair
 } from 'lucide-react';
 
 interface GeometryItem {
@@ -77,7 +77,14 @@ export default function Home() {
     setHoveredRoomId(null);
     setSelectedRoomId(null);
 
-    setImageUrl(URL.createObjectURL(selectedFile));
+    const url = URL.createObjectURL(selectedFile);
+    setImageUrl(url);
+
+    const img = new Image();
+    img.onload = () => {
+      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = url;
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -210,11 +217,247 @@ export default function Home() {
     };
   };
 
+  // Minimal Student-Style Cartesian Quadrant Canvas
+  const renderCartesianQuadrantCanvas = (showInferenceData: boolean) => {
+    const W = imageSize?.width || 800;
+    const H = imageSize?.height || 600;
+
+    const MxLeft = W * 0.35;
+    const MxRight = W * 0.15;
+    const MyTop = H * 0.15;
+    const MyBottom = H * 0.35;
+
+    const minX = -MxLeft;
+    const minY = -MyTop;
+    const totalW = W + MxLeft + MxRight;
+    const totalH = H + MyTop + MyBottom;
+
+    const originX = 0;
+    const originY = H;
+
+    const stepX = Math.round(W / 4 / 50) * 50 || 100;
+    const stepY = Math.round(H / 4 / 50) * 50 || 100;
+
+    const ticksX: number[] = [];
+    for (let x = Math.floor(minX / stepX) * stepX; x <= W + MxRight; x += stepX) {
+      ticksX.push(x);
+    }
+
+    const ticksY: number[] = [];
+    for (let y = Math.floor(minY / stepY) * stepY; y <= H + MyBottom; y += stepY) {
+      ticksY.push(y);
+    }
+
+    return (
+      <div className="relative border border-slate-300 rounded bg-white overflow-hidden shadow-sm flex items-center justify-center">
+        <svg
+          ref={showInferenceData ? svgRef : undefined}
+          viewBox={`${minX} ${minY} ${totalW} ${totalH}`}
+          className="w-full h-auto max-h-[560px] block font-mono"
+        >
+          <defs>
+            {/* Minimal Light Grid */}
+            <pattern id="minimal-grid" width={stepX / 2} height={stepY / 2} patternUnits="userSpaceOnUse">
+              <path d={`M ${stepX / 2} 0 L 0 0 0 ${stepY / 2}`} fill="none" stroke="#e2e8f0" strokeWidth="0.8" />
+            </pattern>
+          </defs>
+
+          {/* WHITE BACKGROUND & MINIMAL GRID ACROSS ALL QUADRANTS */}
+          <rect x={minX} y={minY} width={totalW} height={totalH} fill="#ffffff" />
+          <rect x={minX} y={minY} width={totalW} height={totalH} fill="url(#minimal-grid)" />
+
+          {/* QUADRANT I (+, +): Thin outline surrounding floorplan region */}
+          <rect x={0} y={0} width={W} height={H} fill="#f8fafc" opacity="0.5" stroke="#64748b" strokeWidth="1" strokeDasharray="4,4" />
+
+          {/* MINIMAL QUADRANT LABELS */}
+          <text x={W - 120} y={25} fill="#334155" fontSize="12" fontWeight="bold">
+            Quadrant I (+,+)
+          </text>
+          <text x={minX + 20} y={25} fill="#94a3b8" fontSize="11" fontWeight="semibold">
+            Quadrant II (-,+)
+          </text>
+          <text x={minX + 20} y={H + MyBottom - 20} fill="#94a3b8" fontSize="11" fontWeight="semibold">
+            Quadrant III (-,-)
+          </text>
+          <text x={W - 120} y={H + MyBottom - 20} fill="#94a3b8" fontSize="11" fontWeight="semibold">
+            Quadrant IV (+,-)
+          </text>
+
+          {/* FLOORPLAN IMAGE STRICTLY INSIDE QUADRANT I (0 -> W, 0 -> H) */}
+          {imageUrl && (
+            <image
+              href={imageUrl}
+              x={0}
+              y={0}
+              width={W}
+              height={H}
+              opacity={showInferenceData ? "0.6" : "0.95"}
+              preserveAspectRatio="none"
+            />
+          )}
+
+          {/* INFERENCE OVERLAYS */}
+          {showInferenceData && responseData && (
+            <>
+              {/* Geometry Polygons */}
+              {responseData.geometry.map((geom) => {
+                const isHovered = hoveredRoomId === geom.id;
+                const isSelected = selectedRoomId === geom.id;
+                const colors = getRoomColor(geom.type, geom.id, isHovered, isSelected);
+
+                return (
+                  <polygon
+                    key={`room-${geom.id}`}
+                    points={geom.coordinates.map((c) => `${c[0]},${c[1]}`).join(' ')}
+                    fill={colors.fill}
+                    stroke={colors.stroke}
+                    strokeWidth={colors.strokeWidth}
+                    className="transition-all duration-150 cursor-pointer"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseEnter={() => setHoveredRoomId(geom.id)}
+                    onMouseLeave={() => setHoveredRoomId(null)}
+                    onClick={() => setSelectedRoomId(selectedRoomId === geom.id ? null : geom.id)}
+                  />
+                );
+              })}
+
+              {/* Topology Adjacency Edges */}
+              {responseData.topology.edges.map((edge, index) => {
+                const srcNode = responseData.topology.nodes.find(n => n.id === edge.source);
+                const tgtNode = responseData.topology.nodes.find(n => n.id === edge.target);
+                if (!srcNode || !tgtNode) return null;
+
+                const isEdgeHighlighted = 
+                  hoveredRoomId === edge.source || 
+                  hoveredRoomId === edge.target || 
+                  selectedRoomId === edge.source || 
+                  selectedRoomId === edge.target;
+
+                return (
+                  <line
+                    key={`edge-${index}`}
+                    x1={srcNode.centroid[0]}
+                    y1={srcNode.centroid[1]}
+                    x2={tgtNode.centroid[0]}
+                    y2={tgtNode.centroid[1]}
+                    stroke={isEdgeHighlighted ? "#ef4444" : "#2563eb"}
+                    strokeWidth={isEdgeHighlighted ? 3 : 1.5}
+                    strokeDasharray={isEdgeHighlighted ? "none" : "4,4"}
+                  />
+                );
+              })}
+
+              {/* Topology Centroid Nodes & Labels */}
+              {responseData.topology.nodes.map((node) => {
+                const isHovered = hoveredRoomId === node.id;
+                const isSelected = selectedRoomId === node.id;
+                
+                return (
+                  <g 
+                    key={`node-${node.id}`}
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseEnter={() => setHoveredRoomId(node.id)}
+                    onMouseLeave={() => setHoveredRoomId(null)}
+                    onClick={() => setSelectedRoomId(selectedRoomId === node.id ? null : node.id)}
+                    className="cursor-pointer"
+                  >
+                    {/* RED NODE POINTS */}
+                    <circle
+                      cx={node.centroid[0]}
+                      cy={node.centroid[1]}
+                      r={isHovered || isSelected ? 6 : 4}
+                      fill="#ef4444"
+                      stroke="#ffffff"
+                      strokeWidth={1.5}
+                    />
+                    <text
+                      x={node.centroid[0]}
+                      y={node.centroid[1] - 8}
+                      fill={isHovered || isSelected ? "#dc2626" : "#0f172a"}
+                      fontSize={isHovered || isSelected ? "11" : "8"}
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      style={{ select: 'none', userSelect: 'none' }}
+                    >
+                      {node.type === 'room' ? `Room ${node.id}` : `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.id}`}
+                    </text>
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {/* AXIS TICKS & VALUES (BLACK TEXT, RED DOTS) */}
+          {ticksX.map((xVal) => {
+            const cartX = Math.round(xVal);
+            return (
+              <g key={`tick-x-${xVal}`}>
+                <line x1={xVal} y1={originY - 4} x2={xVal} y2={originY + 4} stroke="#000000" strokeWidth="1" />
+                {xVal !== originX && (
+                  <text x={xVal} y={originY + 16} fill="#334155" fontSize="10" textAnchor="middle">
+                    {cartX > 0 ? `+${cartX}` : cartX}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {ticksY.map((yVal) => {
+            const cartY = Math.round(originY - yVal);
+            return (
+              <g key={`tick-y-${yVal}`}>
+                <line x1={originX - 4} y1={yVal} x2={originX + 4} y2={yVal} stroke="#000000" strokeWidth="1" />
+                {yVal !== originY && (
+                  <text x={originX - 8} y={yVal + 4} fill="#334155" fontSize="10" textAnchor="end">
+                    {cartY > 0 ? `+${cartY}` : cartY}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* MAIN BLACK AXIS LINES (X & Y) */}
+          {/* X AXIS */}
+          <line x1={minX} y1={originY} x2={W + MxRight} y2={originY} stroke="#000000" strokeWidth="1.5" />
+          <text x={W + MxRight - 20} y={originY - 8} fill="#000000" fontSize="11" fontWeight="bold">
+            +X
+          </text>
+          <text x={minX + 5} y={originY - 8} fill="#000000" fontSize="11" fontWeight="bold">
+            -X
+          </text>
+
+          {/* Y AXIS */}
+          <line x1={originX} y1={H + MyBottom} x2={originX} y2={minY} stroke="#000000" strokeWidth="1.5" />
+          <text x={originX + 8} y={minY + 15} fill="#000000" fontSize="11" fontWeight="bold">
+            +Y
+          </text>
+          <text x={originX + 8} y={H + MyBottom - 8} fill="#000000" fontSize="11" fontWeight="bold">
+            -Y
+          </text>
+
+          {/* RED ORIGIN POINT (0, 0) AT BOTTOM-LEFT OF FLOORPLAN */}
+          <g transform={`translate(${originX}, ${originY})`}>
+            <circle r="5" fill="#ef4444" stroke="#ffffff" strokeWidth="1.5" />
+            <text x="8" y="-6" fill="#ef4444" fontSize="11" fontWeight="bold">
+              Origin (0,0)
+            </text>
+          </g>
+        </svg>
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
       <div className="max-w-7xl mx-auto px-6 mt-8">
-        <div className="mb-6 border-b border-slate-200 pb-4">
-          <h2 className="text-2xl font-bold text-slate-950">Floorplan Spatial Parser</h2>
+        <div className="mb-6 border-b border-slate-200 pb-4 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-950">Floorplan Spatial Parser</h2>
+            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+              <Crosshair className="h-3.5 w-3.5 text-red-600" />
+              Cartesian Display Scale: Image placed in <span className="font-bold text-slate-800">Quadrant I (+,+)</span> with Origin (0,0) at bottom-left corner.
+            </p>
+          </div>
         </div>
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-start gap-2.5">
@@ -253,13 +496,7 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="relative border border-slate-200 rounded bg-slate-100 aspect-video flex items-center justify-center overflow-hidden">
-                    <img 
-                      src={imageUrl} 
-                      alt="Upload Preview" 
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  </div>
+                  {renderCartesianQuadrantCanvas(false)}
 
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
                     <div className="flex justify-between">
@@ -267,8 +504,8 @@ export default function Home() {
                       <span className="font-mono text-slate-700 truncate max-w-[180px]">{file?.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Size:</span>
-                      <span className="font-mono text-slate-700">{file ? `${(file.size / 1024).toFixed(1)} KB` : '0 KB'}</span>
+                      <span className="text-slate-500">Display Scale:</span>
+                      <span className="font-mono text-slate-800 font-bold">Quadrant I (+,+)</span>
                     </div>
                   </div>
 
@@ -327,7 +564,7 @@ export default function Home() {
             <div className="bg-white border border-slate-200 rounded-md p-5 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-slate-500" /> 2. Visual Layout Overlay
+                  <Layers className="h-4 w-4 text-slate-500" /> 2. Visual Layout Overlay (Quadrant I Display Scale)
                 </h3>
                 
                 {responseData && (
@@ -347,112 +584,7 @@ export default function Home() {
                   <p className="text-[11px] max-w-xs mt-1 text-slate-400">Please upload a floorplan drawing and click "Run Inferences" to see semantic boundaries and adjacency graph lines.</p>
                 </div>
               ) : (
-                <div className="relative border border-slate-200 rounded bg-slate-100 flex items-center justify-center overflow-hidden max-h-[500px]">
-                  {imageUrl && (
-                    <>
-                      <img 
-                        src={imageUrl} 
-                        alt="Blueprint source background" 
-                        className="max-w-full max-h-[500px] object-contain block opacity-30 select-none pointer-events-none"
-                        onLoad={(e) => {
-                          const img = e.currentTarget;
-                          setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-                        }}
-                      />
-                      {imageSize && (
-                        <svg
-                          ref={svgRef}
-                          viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-                          className="absolute inset-0 w-full h-full"
-                          style={{ pointerEvents: 'none' }}
-                        >
-                          {responseData.geometry.map((geom) => {
-                            const isHovered = hoveredRoomId === geom.id;
-                            const isSelected = selectedRoomId === geom.id;
-                            const colors = getRoomColor(geom.type, geom.id, isHovered, isSelected);
-
-                            return (
-                              <polygon
-                                key={`room-${geom.id}`}
-                                points={geom.coordinates.map((c) => `${c[0]},${c[1]}`).join(' ')}
-                                fill={colors.fill}
-                                stroke={colors.stroke}
-                                strokeWidth={colors.strokeWidth}
-                                className="transition-all duration-150 cursor-pointer"
-                                style={{ pointerEvents: 'auto' }}
-                                onMouseEnter={() => setHoveredRoomId(geom.id)}
-                                onMouseLeave={() => setHoveredRoomId(null)}
-                                onClick={() => setSelectedRoomId(selectedRoomId === geom.id ? null : geom.id)}
-                              />
-                            );
-                          })}
-
-                          {responseData.topology.edges.map((edge, index) => {
-                            const srcNode = responseData.topology.nodes.find(n => n.id === edge.source);
-                            const tgtNode = responseData.topology.nodes.find(n => n.id === edge.target);
-
-                            if (!srcNode || !tgtNode) return null;
-
-                            const isEdgeHighlighted = 
-                              hoveredRoomId === edge.source || 
-                              hoveredRoomId === edge.target || 
-                              selectedRoomId === edge.source || 
-                              selectedRoomId === edge.target;
-
-                            return (
-                              <line
-                                key={`edge-${index}`}
-                                x1={srcNode.centroid[0]}
-                                y1={srcNode.centroid[1]}
-                                x2={tgtNode.centroid[0]}
-                                y2={tgtNode.centroid[1]}
-                                stroke={isEdgeHighlighted ? "#22c55e" : "#8b5cf6"}
-                                strokeWidth={isEdgeHighlighted ? 3 : 1.5}
-                                strokeDasharray={isEdgeHighlighted ? "none" : "4,4"}
-                              />
-                            );
-                          })}
-
-                          {responseData.topology.nodes.map((node) => {
-                            const isHovered = hoveredRoomId === node.id;
-                            const isSelected = selectedRoomId === node.id;
-                            
-                            return (
-                              <g 
-                                key={`node-${node.id}`}
-                                style={{ pointerEvents: 'auto' }}
-                                onMouseEnter={() => setHoveredRoomId(node.id)}
-                                onMouseLeave={() => setHoveredRoomId(null)}
-                                onClick={() => setSelectedRoomId(selectedRoomId === node.id ? null : node.id)}
-                                className="cursor-pointer"
-                              >
-                                <circle
-                                  cx={node.centroid[0]}
-                                  cy={node.centroid[1]}
-                                  r={isHovered || isSelected ? 7 : 4}
-                                  fill={isHovered || isSelected ? "#22c55e" : "#8b5cf6"}
-                                  stroke="#ffffff"
-                                  strokeWidth={1}
-                                />
-                                <text
-                                  x={node.centroid[0]}
-                                  y={node.centroid[1] - 8}
-                                  fill={isHovered || isSelected ? "#15803d" : "#4b5563"}
-                                  fontSize={isHovered || isSelected ? "11" : "8"}
-                                  fontWeight="bold"
-                                  textAnchor="middle"
-                                  style={{ select: 'none', userSelect: 'none' }}
-                                >
-                                  {node.type === 'room' ? `Room ${node.id}` : `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.id}`}
-                                </text>
-                              </g>
-                            );
-                          })}
-                        </svg>
-                      )}
-                    </>
-                  )}
-                </div>
+                renderCartesianQuadrantCanvas(true)
               )}
             </div>
 
